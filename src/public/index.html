@@ -22,6 +22,7 @@
 
   <div class="card" id="app">Memuat status...</div>
   <div id="message"></div>
+  <p class="row"><button id="logout">Logout</button></p>
 
   <script>
     const app = document.getElementById('app');
@@ -74,6 +75,11 @@
         loadStatus();
       };
     }
+
+    document.getElementById('logout').onclick = async () => {
+      await fetch('/session/logout', { method: 'POST' });
+      window.location.href = '/login.html';
+    };
 
     const params = new URLSearchParams(window.location.search);
     if (params.get('connect') === 'success') showMessage('Berhasil terhubung!');

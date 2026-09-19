@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Login — NC-IG</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 360px; margin: 100px auto; padding: 0 16px; color: #1a1a1a; }
+    h1 { font-size: 1.4rem; }
+    button { padding: 10px 16px; font-size: 1rem; cursor: pointer; border-radius: 6px; border: 1px solid #ccc; background: #fafafa; width: 100%; }
+    button:hover { background: #f0f0f0; }
+    .card { border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px; margin-top: 20px; }
+    input[type="password"] { width: 100%; padding: 8px; box-sizing: border-box; margin-bottom: 12px; }
+    #message { margin-top: 12px; font-size: 0.9rem; color: #c0392b; }
+  </style>
+</head>
+<body>
+  <h1>NC-IG</h1>
+  <div class="card">
+    <form id="login-form">
+      <input type="password" id="password" placeholder="Password" autofocus />
+      <button type="submit">Login</button>
+    </form>
+    <div id="message"></div>
+  </div>
+
+  <script>
+    const form = document.getElementById('login-form');
+    const message = document.getElementById('message');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      message.textContent = '';
+      const password = document.getElementById('password').value;
+
+      const res = await fetch('/session/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+
+      if (res.ok) {
+        window.location.href = '/';
+        return;
+      }
+
+      const data = await res.json().catch(() => ({}));
+      message.textContent = data.error || 'Login gagal.';
+    });
+  </script>
+</body>
+</html>

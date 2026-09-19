@@ -8,17 +8,21 @@ import {
 import { fetchProfile } from "../instagram/client.js";
 import { saveOAuthState, consumeOAuthState, upsertConnection } from "../db.js";
 
+// Mulai flow OAuth: hanya boleh dipicu operator yang sudah login (di-mount
+// di server.ts SETELAH requireAuth). Buat state anti-CSRF, simpan, lalu
+// redirect ke Instagram.
 export const authRouter = Router();
-
-// Mulai flow OAuth: buat state anti-CSRF, simpan, lalu redirect ke Instagram.
 authRouter.get("/instagram", (_req, res) => {
   const state = generateState();
   saveOAuthState(state);
   res.redirect(buildAuthorizeUrl(state));
 });
 
-// Callback dari Instagram setelah user approve/tolak.
-authRouter.get("/instagram/callback", async (req, res) => {
+// Callback dari Instagram setelah user approve/tolak — dipanggil via redirect
+// browser dari Meta, BUKAN dari konteks session operator. Router terpisah,
+// di-mount di server.ts SEBELUM requireAuth supaya tetap terbuka.
+export const authCallbackRouter = Router();
+authCallbackRouter.get("/instagram/callback", async (req, res) => {
   const { code, state, error, error_reason: errorReason } = req.query as Record<string, string | undefined>;
 
   if (error) {
