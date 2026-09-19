@@ -5,6 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>DM — NC-IG</title>
   <link rel="stylesheet" href="/style.css" />
+  <style>
+    .dm-layout { display: flex; gap: 16px; margin-top: 20px; }
+    .dm-threads { width: 220px; flex-shrink: 0; border: 1px solid #e0e0e0; border-radius: 8px; max-height: 480px; overflow-y: auto; }
+    .dm-thread-item { padding: 10px 12px; border-bottom: 1px solid #f0f0f0; cursor: pointer; font-size: 0.85rem; }
+    .dm-thread-item:hover { background: #f7f7f7; }
+    .dm-thread-item.active { background: #eef2ff; }
+    .dm-conversation { flex: 1; border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px; display: flex; flex-direction: column; min-height: 300px; }
+    .dm-messages { flex: 1; overflow-y: auto; max-height: 380px; margin-bottom: 12px; }
+    .dm-msg { margin: 6px 0; padding: 8px 10px; border-radius: 8px; max-width: 80%; font-size: 0.9rem; white-space: pre-wrap; }
+    .dm-msg.inbound { background: #f0f0f0; align-self: flex-start; }
+    .dm-msg.outbound { background: #dbeafe; margin-left: auto; }
+    .dm-reply-form { display: flex; gap: 8px; }
+    .dm-reply-form input { flex: 1; margin-bottom: 0; }
+  </style>
 </head>
 <body>
   <h1>NC-IG</h1>
@@ -19,18 +33,108 @@
     <a href="/stories.html">Stories</a>
   </nav>
 
-  <div class="card">
-    <strong>DM</strong>
-    <div class="row muted">Inbox pesan langsung Instagram — segera hadir.</div>
+  <div class="dm-layout">
+    <div class="dm-threads" id="thread-list">Memuat...</div>
+    <div class="dm-conversation">
+      <div class="dm-messages" id="messages">Pilih percakapan di sebelah kiri.</div>
+      <form id="reply-form" class="dm-reply-form" style="display: none">
+        <input type="text" id="reply-text" placeholder="Tulis balasan..." autocomplete="off" />
+        <button type="submit">Kirim</button>
+      </form>
+    </div>
   </div>
+  <div id="message" class="row muted"></div>
 
   <footer><button id="logout">Logout</button></footer>
 
   <script>
+    let activeThreadId = null;
+    const threadList = document.getElementById('thread-list');
+    const messagesEl = document.getElementById('messages');
+    const replyForm = document.getElementById('reply-form');
+    const statusEl = document.getElementById('message');
+
+    function showStatus(text) {
+      statusEl.textContent = text;
+    }
+
+    function threadLabel(thread) {
+      return thread.username ? '@' + thread.username : thread.ig_scoped_id;
+    }
+
+    async function loadThreads() {
+      const res = await fetch('/api/messages/threads');
+      const data = await res.json();
+
+      if (data.threads.length === 0) {
+        threadList.innerHTML = '<div class="dm-thread-item muted">Belum ada percakapan.</div>';
+        return;
+      }
+
+      threadList.innerHTML = '';
+      for (const thread of data.threads) {
+        const el = document.createElement('div');
+        el.className = 'dm-thread-item' + (thread.id === activeThreadId ? ' active' : '');
+        el.textContent = threadLabel(thread);
+        el.onclick = () => openThread(thread.id);
+        threadList.appendChild(el);
+      }
+    }
+
+    async function openThread(threadId) {
+      activeThreadId = threadId;
+      await loadThreads();
+
+      const res = await fetch('/api/messages/threads/' + threadId);
+      if (!res.ok) {
+        messagesEl.textContent = 'Gagal memuat percakapan.';
+        return;
+      }
+      const data = await res.json();
+
+      messagesEl.innerHTML = '';
+      for (const msg of data.messages) {
+        const el = document.createElement('div');
+        el.className = 'dm-msg ' + msg.direction;
+        el.textContent = msg.text || '(tanpa teks)';
+        messagesEl.appendChild(el);
+      }
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+      replyForm.style.display = 'flex';
+    }
+
+    replyForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!activeThreadId) return;
+
+      const input = document.getElementById('reply-text');
+      const text = input.value.trim();
+      if (!text) return;
+
+      showStatus('Mengirim...');
+      const res = await fetch('/api/messages/threads/' + activeThreadId + '/reply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        input.value = '';
+        showStatus('');
+        openThread(activeThreadId);
+      } else {
+        showStatus('Gagal: ' + (data.error || 'tidak diketahui'));
+      }
+    });
+
     document.getElementById('logout').onclick = async () => {
       await fetch('/session/logout', { method: 'POST' });
       window.location.href = '/login.html';
     };
+
+    loadThreads();
+    setInterval(loadThreads, 10000); // polling ringan, tanpa SSE/WebSocket
   </script>
 </body>
 </html>

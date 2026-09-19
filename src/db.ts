@@ -32,6 +32,26 @@ db.exec(`
     payload TEXT NOT NULL,
     received_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
+
+  CREATE TABLE IF NOT EXISTS dm_threads (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ig_scoped_id TEXT NOT NULL UNIQUE, -- Instagram-scoped ID lawan bicara
+    username TEXT,
+    last_message_at TEXT NOT NULL DEFAULT (datetime('now')),
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS dm_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    thread_id INTEGER NOT NULL REFERENCES dm_threads(id),
+    direction TEXT NOT NULL, -- inbound | outbound
+    mid TEXT,                -- message id dari Meta, dipakai cek duplikat
+    text TEXT,
+    raw_payload TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_dm_messages_mid ON dm_messages(mid) WHERE mid IS NOT NULL;
 `);
 
 export interface Connection {
@@ -107,4 +127,83 @@ export function logWebhookEvent(eventType: string, payload: unknown): void {
     eventType,
     JSON.stringify(payload)
   );
+}
+
+export interface DmThread {
+  id: number;
+  ig_scoped_id: string;
+  username: string | null;
+  last_message_at: string;
+  created_at: string;
+}
+
+export interface DmMessage {
+  id: number;
+  thread_id: number;
+  direction: "inbound" | "outbound";
+  mid: string | null;
+  text: string | null;
+  raw_payload: string | null;
+  created_at: string;
+}
+
+// Cari thread yang sudah ada, atau buat baru kalau ini kontak pertama kali.
+export function upsertThread(igScopedId: string): DmThread {
+  const existing = db
+    .prepare(`SELECT * FROM dm_threads WHERE ig_scoped_id = ?`)
+    .get(igScopedId) as DmThread | undefined;
+  if (existing) return existing;
+
+  const result = db.prepare(`INSERT INTO dm_threads (ig_scoped_id) VALUES (?)`).run(igScopedId);
+  return db.prepare(`SELECT * FROM dm_threads WHERE id = ?`).get(result.lastInsertRowid) as DmThread;
+}
+
+function touchThread(threadId: number): void {
+  db.prepare(`UPDATE dm_threads SET last_message_at = datetime('now') WHERE id = ?`).run(threadId);
+}
+
+// Idempotent terhadap mid (Meta bisa retry pengiriman webhook yang sama).
+// Return false kalau pesan dengan mid ini sudah pernah disimpan sebelumnya.
+export function insertInboundMessage(data: {
+  threadId: number;
+  mid: string;
+  text: string | undefined;
+  rawPayload: unknown;
+}): boolean {
+  const existing = db.prepare(`SELECT id FROM dm_messages WHERE mid = ?`).get(data.mid);
+  if (existing) return false;
+
+  db.prepare(
+    `INSERT INTO dm_messages (thread_id, direction, mid, text, raw_payload)
+     VALUES (@threadId, 'inbound', @mid, @text, @rawPayload)`
+  ).run({
+    threadId: data.threadId,
+    mid: data.mid,
+    text: data.text ?? null,
+    rawPayload: JSON.stringify(data.rawPayload),
+  });
+  touchThread(data.threadId);
+  return true;
+}
+
+export function insertOutboundMessage(data: { threadId: number; mid?: string; text: string }): void {
+  db.prepare(
+    `INSERT INTO dm_messages (thread_id, direction, mid, text)
+     VALUES (@threadId, 'outbound', @mid, @text)`
+  ).run({ threadId: data.threadId, mid: data.mid ?? null, text: data.text });
+  touchThread(data.threadId);
+}
+
+export function listThreads(): DmThread[] {
+  return db.prepare(`SELECT * FROM dm_threads ORDER BY last_message_at DESC`).all() as DmThread[];
+}
+
+export function getThread(threadId: number): DmThread | undefined {
+  return db.prepare(`SELECT * FROM dm_threads WHERE id = ?`).get(threadId) as DmThread | undefined;
+}
+
+export function getThreadMessages(threadId: number): DmMessage[] {
+  return db
+    .prepare(`SELECT * FROM dm_messages WHERE thread_id = ? ORDER BY id ASC`)
+    .all(threadId) as DmMessage[];
 }

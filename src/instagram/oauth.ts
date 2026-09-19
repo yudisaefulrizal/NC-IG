@@ -5,7 +5,15 @@
 //
 // Scope yang diminta HARUS sudah dicentang/di-approve di Meta App Dashboard,
 // kalau tidak Meta akan menolak authorization request.
-const SCOPES = ["instagram_business_basic", "instagram_business_content_publish"].join(",");
+// manage_messages & manage_comments ditambah untuk fitur DM (Tahap 3) dan
+// Comments (Tahap 4) — akun yang sudah connect dengan scope lama harus
+// reconnect ulang supaya token baru punya izin ini.
+const SCOPES = [
+  "instagram_business_basic",
+  "instagram_business_content_publish",
+  "instagram_business_manage_messages",
+  "instagram_business_manage_comments",
+].join(",");
 
 import { randomBytes } from "node:crypto";
 import { config } from "../config.js";
