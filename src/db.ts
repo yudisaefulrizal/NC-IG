@@ -82,6 +82,19 @@ db.exec(`
     error_message TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
+
+  -- Tabel terpisah dari posts: story tidak punya caption dan sifatnya
+  -- sementara (expire 24 jam di sisi Instagram), riwayat lokal ini hanya
+  -- mencatat pernah dipublish, bukan status kadaluarsanya.
+  CREATE TABLE IF NOT EXISTS stories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ig_media_id TEXT,
+    container_id TEXT,
+    image_url TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'published', -- published | failed
+    error_message TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
 `);
 
 export interface Connection {
@@ -320,4 +333,27 @@ export function insertPost(data: {
 
 export function listPosts() {
   return db.prepare(`SELECT * FROM posts ORDER BY id DESC`).all();
+}
+
+export function insertStory(data: {
+  igMediaId?: string;
+  containerId?: string;
+  imageUrl: string;
+  status: "published" | "failed";
+  errorMessage?: string;
+}): void {
+  db.prepare(
+    `INSERT INTO stories (ig_media_id, container_id, image_url, status, error_message)
+     VALUES (@igMediaId, @containerId, @imageUrl, @status, @errorMessage)`
+  ).run({
+    igMediaId: data.igMediaId ?? null,
+    containerId: data.containerId ?? null,
+    imageUrl: data.imageUrl,
+    status: data.status,
+    errorMessage: data.errorMessage ?? null,
+  });
+}
+
+export function listStories() {
+  return db.prepare(`SELECT * FROM stories ORDER BY id DESC`).all();
 }

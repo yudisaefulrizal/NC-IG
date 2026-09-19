@@ -16,12 +16,17 @@ export async function createImageContainer(params: {
   accessToken: string;
   imageUrl: string;
   caption?: string;
+  mediaType?: "STORIES";
 }): Promise<string> {
   const body = new URLSearchParams({
     image_url: params.imageUrl,
     access_token: params.accessToken,
   });
-  if (params.caption) body.set("caption", params.caption);
+  // Caption tidak didukung dokumentasi untuk Stories — caller (routes/stories.ts)
+  // sudah tidak pernah mengirim caption untuk mediaType STORIES, tapi guard
+  // di sini juga supaya aman kalau dipanggil dari tempat lain di masa depan.
+  if (params.caption && params.mediaType !== "STORIES") body.set("caption", params.caption);
+  if (params.mediaType) body.set("media_type", params.mediaType);
 
   const res = await fetch(`${GRAPH_BASE}/${params.igUserId}/media`, {
     method: "POST",
