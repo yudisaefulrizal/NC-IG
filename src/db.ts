@@ -71,6 +71,17 @@ db.exec(`
     text TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
+
+  CREATE TABLE IF NOT EXISTS posts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ig_media_id TEXT,     -- id dari Instagram, hanya terisi kalau sukses
+    container_id TEXT,    -- creation_id sementara, untuk debug kalau gagal
+    caption TEXT,
+    image_url TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'published', -- published | failed
+    error_message TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
 `);
 
 export interface Connection {
@@ -284,4 +295,29 @@ export function insertCommentReply(data: { commentId: string; replyCommentId?: s
   db.prepare(`UPDATE ig_comments SET status = 'replied', updated_at = datetime('now') WHERE id = ?`).run(
     data.commentId
   );
+}
+
+export function insertPost(data: {
+  igMediaId?: string;
+  containerId?: string;
+  caption?: string;
+  imageUrl: string;
+  status: "published" | "failed";
+  errorMessage?: string;
+}): void {
+  db.prepare(
+    `INSERT INTO posts (ig_media_id, container_id, caption, image_url, status, error_message)
+     VALUES (@igMediaId, @containerId, @caption, @imageUrl, @status, @errorMessage)`
+  ).run({
+    igMediaId: data.igMediaId ?? null,
+    containerId: data.containerId ?? null,
+    caption: data.caption ?? null,
+    imageUrl: data.imageUrl,
+    status: data.status,
+    errorMessage: data.errorMessage ?? null,
+  });
+}
+
+export function listPosts() {
+  return db.prepare(`SELECT * FROM posts ORDER BY id DESC`).all();
 }

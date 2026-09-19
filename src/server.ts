@@ -8,6 +8,7 @@ import { dataDeletionRouter, dataDeletionStatusRouter } from "./routes/dataDelet
 import { connectionRouter } from "./routes/connection.js";
 import { messagesRouter } from "./routes/messages.js";
 import { commentsRouter } from "./routes/comments.js";
+import { postsRouter } from "./routes/posts.js";
 import { sessionRouter } from "./routes/session.js";
 import { requireAuth } from "./middleware/requireAuth.js";
 
@@ -61,6 +62,7 @@ app.use("/auth", authRouter);
 app.use("/api/connection", connectionRouter);
 app.use("/api/messages", messagesRouter);
 app.use("/api/comments", commentsRouter);
+app.use("/api/posts", postsRouter);
 app.use(express.static(publicDir));
 
 app.listen(config.port, config.host, () => {
