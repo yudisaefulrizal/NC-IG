@@ -52,6 +52,25 @@ db.exec(`
   );
 
   CREATE UNIQUE INDEX IF NOT EXISTS idx_dm_messages_mid ON dm_messages(mid) WHERE mid IS NOT NULL;
+
+  CREATE TABLE IF NOT EXISTS ig_comments (
+    id TEXT PRIMARY KEY, -- comment id asli dari Instagram, bukan autoincrement
+    media_id TEXT,
+    from_username TEXT,
+    text TEXT,
+    status TEXT NOT NULL DEFAULT 'unreplied', -- unreplied | replied
+    raw_payload TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS ig_comment_replies (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    comment_id TEXT NOT NULL REFERENCES ig_comments(id),
+    reply_comment_id TEXT, -- id balasan yang dikembalikan Meta setelah POST
+    text TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
 `);
 
 export interface Connection {
@@ -206,4 +225,63 @@ export function getThreadMessages(threadId: number): DmMessage[] {
   return db
     .prepare(`SELECT * FROM dm_messages WHERE thread_id = ? ORDER BY id ASC`)
     .all(threadId) as DmMessage[];
+}
+
+export interface IgComment {
+  id: string;
+  media_id: string | null;
+  from_username: string | null;
+  text: string | null;
+  status: "unreplied" | "replied";
+  raw_payload: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// Idempotent: upsert supaya webhook retry/duplicate tidak bikin baris ganda
+// (comment id dari Meta dipakai langsung sebagai primary key).
+export function upsertComment(data: {
+  id: string;
+  mediaId?: string;
+  fromUsername?: string;
+  text?: string;
+  rawPayload: unknown;
+}): void {
+  db.prepare(
+    `INSERT INTO ig_comments (id, media_id, from_username, text, raw_payload)
+     VALUES (@id, @mediaId, @fromUsername, @text, @rawPayload)
+     ON CONFLICT(id) DO UPDATE SET
+       media_id = excluded.media_id,
+       from_username = excluded.from_username,
+       text = excluded.text,
+       raw_payload = excluded.raw_payload,
+       updated_at = datetime('now')`
+  ).run({
+    id: data.id,
+    mediaId: data.mediaId ?? null,
+    fromUsername: data.fromUsername ?? null,
+    text: data.text ?? null,
+    rawPayload: JSON.stringify(data.rawPayload),
+  });
+}
+
+export function listComments(): IgComment[] {
+  return db.prepare(`SELECT * FROM ig_comments ORDER BY created_at DESC`).all() as IgComment[];
+}
+
+export function getComment(commentId: string): IgComment | undefined {
+  return db.prepare(`SELECT * FROM ig_comments WHERE id = ?`).get(commentId) as IgComment | undefined;
+}
+
+export function insertCommentReply(data: { commentId: string; replyCommentId?: string; text: string }): void {
+  db.prepare(
+    `INSERT INTO ig_comment_replies (comment_id, reply_comment_id, text) VALUES (@commentId, @replyCommentId, @text)`
+  ).run({
+    commentId: data.commentId,
+    replyCommentId: data.replyCommentId ?? null,
+    text: data.text,
+  });
+  db.prepare(`UPDATE ig_comments SET status = 'replied', updated_at = datetime('now') WHERE id = ?`).run(
+    data.commentId
+  );
 }

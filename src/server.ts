@@ -7,6 +7,7 @@ import { deauthorizeRouter } from "./routes/deauthorize.js";
 import { dataDeletionRouter, dataDeletionStatusRouter } from "./routes/dataDeletion.js";
 import { connectionRouter } from "./routes/connection.js";
 import { messagesRouter } from "./routes/messages.js";
+import { commentsRouter } from "./routes/comments.js";
 import { sessionRouter } from "./routes/session.js";
 import { requireAuth } from "./middleware/requireAuth.js";
 
@@ -59,6 +60,7 @@ app.use(requireAuth);
 app.use("/auth", authRouter);
 app.use("/api/connection", connectionRouter);
 app.use("/api/messages", messagesRouter);
+app.use("/api/comments", commentsRouter);
 app.use(express.static(publicDir));
 
 app.listen(config.port, config.host, () => {

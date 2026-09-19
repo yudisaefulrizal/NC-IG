@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { config } from "../config.js";
 import { verifyWebhookSignature } from "../instagram/webhookSignature.js";
-import { logWebhookEvent, upsertThread, insertInboundMessage } from "../db.js";
+import { logWebhookEvent, upsertThread, insertInboundMessage, upsertComment } from "../db.js";
 
 export const webhookRouter = Router();
 
@@ -36,6 +36,7 @@ webhookRouter.post("/instagram", (req, res) => {
   logWebhookEvent(req.body?.object ?? "unknown", req.body);
 
   handleMessagingEntries(req.body);
+  handleCommentEntries(req.body);
 
   // Meta mengharapkan respons cepat; proses lanjutan (jika ada) sebaiknya
   // dikerjakan async/di luar request ini agar tidak timeout.
@@ -83,6 +84,35 @@ function handleMessagingEntries(body: unknown): void {
         mid,
         text: event.message?.text,
         rawPayload: event,
+      });
+    }
+  }
+}
+
+// Payload komentar baru: entry[].changes[] dengan field:"comments" (sama
+// pola dengan payload sampel "messages" yang sudah dikonfirmasi nyata).
+interface CommentEvent {
+  id?: string;
+  text?: string;
+  media?: { id?: string };
+  from?: { username?: string; id?: string };
+}
+
+function handleCommentEntries(body: unknown): void {
+  const entries = (body as { entry?: unknown[] })?.entry ?? [];
+
+  for (const entry of entries) {
+    const changes = (entry as { changes?: { field?: string; value?: CommentEvent }[] })?.changes ?? [];
+
+    for (const change of changes) {
+      if (change.field !== "comments" || !change.value?.id) continue;
+
+      upsertComment({
+        id: change.value.id,
+        mediaId: change.value.media?.id,
+        fromUsername: change.value.from?.username,
+        text: change.value.text,
+        rawPayload: change.value,
       });
     }
   }
