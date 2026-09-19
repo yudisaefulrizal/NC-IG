@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Posts — NC-IG</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <h1>NC-IG</h1>
+  <p class="muted">Instagram API Integration Sandbox</p>
+
+  <nav>
+    <a href="/">Home</a>
+    <a href="/connection.html">Connection</a>
+    <a href="/dm.html">DM</a>
+    <a href="/comments.html">Comments</a>
+    <a href="/posts.html" class="active">Posts</a>
+    <a href="/stories.html">Stories</a>
+  </nav>
+
+  <div class="card">
+    <strong>Posts</strong>
+    <div class="row muted">Publikasikan feed post dengan caption &amp; riwayat — segera hadir. Untuk testing publish cepat, lihat halaman <a href="/connection.html">Connection</a>.</div>
+  </div>
+
+  <footer><button id="logout">Logout</button></footer>
+
+  <script>
+    document.getElementById('logout').onclick = async () => {
+      await fetch('/session/logout', { method: 'POST' });
+      window.location.href = '/login.html';
+    };
+  </script>
+</body>
+</html>

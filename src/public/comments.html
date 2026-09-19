@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Comments — NC-IG</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <h1>NC-IG</h1>
+  <p class="muted">Instagram API Integration Sandbox</p>
+
+  <nav>
+    <a href="/">Home</a>
+    <a href="/connection.html">Connection</a>
+    <a href="/dm.html">DM</a>
+    <a href="/comments.html" class="active">Comments</a>
+    <a href="/posts.html">Posts</a>
+    <a href="/stories.html">Stories</a>
+  </nav>
+
+  <div class="card">
+    <strong>Comments</strong>
+    <div class="row muted">Balas komentar pada media Instagram — segera hadir.</div>
+  </div>
+
+  <footer><button id="logout">Logout</button></footer>
+
+  <script>
+    document.getElementById('logout').onclick = async () => {
+      await fetch('/session/logout', { method: 'POST' });
+      window.location.href = '/login.html';
+    };
+  </script>
+</body>
+</html>
