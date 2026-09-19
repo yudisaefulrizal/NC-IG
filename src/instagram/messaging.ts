@@ -3,7 +3,7 @@
 // https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login/messaging-api/
 // Endpoint & auth berbeda dari publish.ts/client.ts (graph.instagram.com
 // yang sama, tapi access_token di header Authorization, bukan query string).
-const GRAPH_BASE = "https://graph.instagram.com/v21.0";
+const GRAPH_BASE = "https://graph.instagram.com/v23.0";
 
 interface SendMessageResponse {
   recipient_id: string;
