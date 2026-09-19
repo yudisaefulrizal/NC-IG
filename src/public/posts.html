@@ -6,53 +6,86 @@
   <title>Posts — NC-IG</title>
   <link rel="stylesheet" href="/style.css" />
   <style>
-    .post-item { border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px 16px; margin-top: 12px; }
-    .post-item img { max-width: 100%; max-height: 200px; border-radius: 6px; margin-top: 8px; }
-    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; }
-    .badge.published { background: #dcfce7; color: #166534; }
-    .badge.failed { background: #fee2e2; color: #991b1b; }
+    .field-label { font-weight: 600; font-size: 0.9rem; margin-bottom: 6px; }
+    .post-item { display: flex; gap: 16px; align-items: flex-start; }
+    .post-thumb { width: 64px; height: 64px; border-radius: var(--nc-radius-md); object-fit: cover; background: #eee; flex-shrink: 0; }
+    .post-body { flex: 1; min-width: 0; }
+    .post-caption { margin: 2px 0 4px; }
+    .post-error { color: #991b1b; font-size: 0.85rem; }
+    .post-meta { font-size: 0.8rem; color: var(--nc-text-muted); }
+    .loading-spin { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.5); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: -2px; margin-right: 6px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
-  <h1>NC-IG</h1>
-  <p class="muted">Instagram API Integration Sandbox</p>
-
-  <nav>
-    <a href="/">Home</a>
-    <a href="/connection.html">Connection</a>
-    <a href="/dm.html">DM</a>
-    <a href="/comments.html">Comments</a>
-    <a href="/posts.html" class="active">Posts</a>
-    <a href="/stories.html">Stories</a>
-    <span id="account-switcher"></span>
-  </nav>
-
-  <div class="card">
-    <strong>Buat post baru</strong>
-    <form id="post-form">
-      <div class="row">
-        <label>URL gambar (harus bisa diakses publik)</label>
-        <input type="text" id="image-url" placeholder="https://.../gambar.jpg" />
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebar-brand"><img src="/logo.png" alt="NC-IG" /><span>NC-IG</span></div>
+      <nav class="sidebar-nav">
+        <a href="/">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>
+          Beranda
+        </a>
+        <a href="/connection.html">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          Koneksi
+        </a>
+        <a href="/dm.html">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          DM
+        </a>
+        <a href="/comments.html">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+          Komentar
+        </a>
+        <a href="/posts.html" class="active">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          Posts
+        </a>
+        <a href="/stories.html">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+          Stories
+        </a>
+      </nav>
+      <div class="sidebar-glow"></div>
+      <div class="sidebar-footer">
+        <button id="logout">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Logout
+        </button>
       </div>
-      <div class="row">
-        <label>Caption (opsional)</label>
-        <input type="text" id="caption" placeholder="Tulis caption..." />
+    </aside>
+
+    <main class="content">
+      <div class="content-header">
+        <div></div>
+        <div id="account-switcher"></div>
       </div>
-      <button type="submit">Publish</button>
-    </form>
+
+      <div class="card">
+        <h2 class="page-title" style="font-size:1.3rem;margin:0 0 16px" id="form-title">Publish Post</h2>
+        <form id="post-form">
+          <div class="field-label">URL gambar</div>
+          <input type="text" id="image-url" placeholder="https://example.com/gambar.jpg" />
+          <div class="field-label" style="margin-top:10px">Caption (opsional)</div>
+          <textarea id="caption" rows="3" placeholder="Tulis caption di sini..."></textarea>
+          <button type="submit" class="primary" id="submit-btn" style="width:100%;margin-top:6px">Publish</button>
+        </form>
+      </div>
+      <div id="message" class="row muted"></div>
+
+      <h2 class="page-title" style="font-size:1.2rem;margin-top:28px" id="history-title">Riwayat</h2>
+      <div id="list">Memuat...</div>
+    </main>
   </div>
-
-  <div id="message" class="row muted"></div>
-
-  <h3>Riwayat</h3>
-  <div id="list">Memuat...</div>
-
-  <footer><button id="logout">Logout</button></footer>
 
   <script src="/account-switcher.js"></script>
   <script>
     const statusEl = document.getElementById('message');
     const list = document.getElementById('list');
+    const submitBtn = document.getElementById('submit-btn');
+    const formTitle = document.getElementById('form-title');
+    const historyTitle = document.getElementById('history-title');
 
     function showStatus(text) {
       statusEl.textContent = text;
@@ -70,12 +103,15 @@
       list.innerHTML = '';
       for (const p of data.posts) {
         const el = document.createElement('div');
-        el.className = 'post-item';
+        el.className = 'card post-item';
         el.innerHTML = `
-          <span class="badge ${p.status}">${p.status}</span>
-          <div class="row">${p.caption || '<span class="muted">(tanpa caption)</span>'}</div>
-          ${p.status === 'failed' ? `<div class="row muted">${p.error_message || ''}</div>` : ''}
-          <img src="${p.image_url}" alt="" onerror="this.style.display='none'" />
+          <img class="post-thumb" src="${p.image_url}" alt="" onerror="this.style.visibility='hidden'" />
+          <div class="post-body">
+            <span class="badge ${p.status}">${p.status === 'published' ? 'Published' : 'Failed'}</span>
+            <div class="post-caption">${p.caption || '<span class="muted">(tanpa caption)</span>'}</div>
+            ${p.status === 'failed' ? `<div class="post-error">${p.error_message || ''}</div>` : ''}
+            <div class="post-meta">${new Date(p.created_at).toLocaleString('id-ID')}</div>
+          </div>
         `;
         list.appendChild(el);
       }
@@ -87,13 +123,19 @@
       const caption = document.getElementById('caption').value.trim();
       if (!imageUrl) return;
 
-      showStatus('Publishing (bisa beberapa detik)...');
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span class="loading-spin"></span>Mempublikasikan...';
+      showStatus('');
+
       const res = await fetch('/api/posts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ imageUrl, caption: caption || undefined }),
       });
       const data = await res.json();
+
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Publish';
 
       if (res.ok) {
         showStatus('Berhasil publish.');
@@ -110,7 +152,13 @@
       window.location.href = '/login.html';
     };
 
-    initAccountSwitcher(() => loadPosts());
+    initAccountSwitcher((connectionId) => {
+      const select = document.getElementById('account-switcher-select');
+      const label = select ? select.selectedOptions[0].textContent : '';
+      formTitle.innerHTML = `Publish Post untuk <span style="color:var(--nc-green-600)">${label}</span>`;
+      historyTitle.innerHTML = `Riwayat Post <span style="color:var(--nc-green-600)">${label}</span>`;
+      loadPosts();
+    });
   </script>
 </body>
 </html>

@@ -38,8 +38,9 @@ app.use(express.urlencoded({ extended: false })); // untuk signed_request (form-
 // mengunduhnya, jadi WAJIB tetap bisa diakses tanpa cookie.
 app.get("/sample.jpg", (_req, res) => res.sendFile(path.join(publicDir, "sample.jpg")));
 app.get("/login.html", (_req, res) => res.sendFile(path.join(publicDir, "login.html")));
-// style.css dipakai juga oleh login.html, jadi harus ikut publik.
+// style.css & logo.png dipakai juga oleh login.html, jadi harus ikut publik.
 app.get("/style.css", (_req, res) => res.sendFile(path.join(publicDir, "style.css")));
+app.get("/logo.png", (_req, res) => res.sendFile(path.join(publicDir, "logo.png")));
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
 

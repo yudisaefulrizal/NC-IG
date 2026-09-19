@@ -33,7 +33,8 @@ async function initAccountSwitcher(onAccountReady) {
   const activeId = data.activeConnectionId || data.connections[0].id;
   select.value = String(activeId);
 
-  container.innerHTML = '';
+  container.innerHTML = '<span class="label">Akun aktif</span>';
+  container.className = 'account-switcher-box';
   container.appendChild(select);
 
   select.addEventListener('change', async () => {
@@ -57,4 +58,18 @@ async function initAccountSwitcher(onAccountReady) {
   }
 
   onAccountReady(activeId);
+}
+
+// Helper avatar bersama: warna konsisten per string (hash sederhana ->
+// index palet tetap di style.css --nc-avatar-colors), dipakai DM/Posts dll.
+const NC_AVATAR_COLORS = ["#22c55e", "#3b82f6", "#f97316", "#a855f7", "#ec4899", "#14b8a6"];
+
+function avatarColorFor(key) {
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+  return NC_AVATAR_COLORS[hash % NC_AVATAR_COLORS.length];
+}
+
+function avatarInitial(name) {
+  return (name || "?").trim().charAt(0).toUpperCase();
 }
