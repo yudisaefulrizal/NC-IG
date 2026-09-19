@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NC-IG</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 480px; margin: 60px auto; padding: 0 16px; color: #1a1a1a; }
+    h1 { font-size: 1.4rem; }
+    button { padding: 10px 16px; font-size: 1rem; cursor: pointer; border-radius: 6px; border: 1px solid #ccc; background: #fafafa; }
+    button:hover { background: #f0f0f0; }
+    .card { border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px; margin-top: 20px; }
+    .muted { color: #666; font-size: 0.9rem; }
+    .row { margin: 8px 0; }
+    input[type="text"] { width: 100%; padding: 8px; box-sizing: border-box; margin-bottom: 8px; }
+    #message { margin-top: 12px; white-space: pre-wrap; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <h1>NC-IG</h1>
+  <p class="muted">Instagram API Integration Sandbox</p>
+
+  <div class="card" id="app">Memuat status...</div>
+  <div id="message"></div>
+
+  <script>
+    const app = document.getElementById('app');
+    const message = document.getElementById('message');
+
+    function showMessage(text) {
+      message.textContent = text;
+    }
+
+    async function loadStatus() {
+      const res = await fetch('/api/connection/status');
+      const data = await res.json();
+
+      if (!data.connected) {
+        app.innerHTML = '<button id="connect">Connect Instagram</button>';
+        document.getElementById('connect').onclick = () => {
+          window.location.href = '/auth/instagram';
+        };
+        return;
+      }
+
+      app.innerHTML = `
+        <strong>Instagram Connected</strong>
+        <div class="row">Username: <strong>@${data.username}</strong></div>
+        <div class="row">Account ID: <code>${data.instagramUserId}</code></div>
+        <div class="row muted">Scopes: ${data.scopes.join(', ')}</div>
+        <div class="row muted">Token expires: ${new Date(data.tokenExpiresAt).toLocaleString()}</div>
+        <div class="row">
+          <button id="test-api">Test API</button>
+          <button id="test-publish">Test Publish</button>
+          <button id="disconnect">Disconnect</button>
+        </div>
+      `;
+
+      document.getElementById('test-api').onclick = async () => {
+        showMessage('Memanggil API...');
+        const r = await fetch('/api/connection/test-api', { method: 'POST' });
+        showMessage(JSON.stringify(await r.json(), null, 2));
+      };
+
+      document.getElementById('test-publish').onclick = async () => {
+        showMessage('Publishing (bisa beberapa detik)...');
+        const r = await fetch('/api/connection/test-publish', { method: 'POST' });
+        showMessage(JSON.stringify(await r.json(), null, 2));
+      };
+
+      document.getElementById('disconnect').onclick = async () => {
+        await fetch('/api/connection/disconnect', { method: 'POST' });
+        showMessage('Terputus.');
+        loadStatus();
+      };
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('connect') === 'success') showMessage('Berhasil terhubung!');
+    if (params.get('connect') === 'cancelled') showMessage('Anda membatalkan proses connect.');
+
+    loadStatus();
+  </script>
+</body>
+</html>
