@@ -31,6 +31,7 @@
     <a href="/comments.html">Comments</a>
     <a href="/posts.html">Posts</a>
     <a href="/stories.html">Stories</a>
+    <span id="account-switcher"></span>
   </nav>
 
   <div class="dm-layout">
@@ -47,6 +48,7 @@
 
   <footer><button id="logout">Logout</button></footer>
 
+  <script src="/account-switcher.js"></script>
   <script>
     let activeThreadId = null;
     const threadList = document.getElementById('thread-list');
@@ -133,7 +135,12 @@
       window.location.href = '/login.html';
     };
 
-    loadThreads();
+    initAccountSwitcher(() => {
+      activeThreadId = null;
+      messagesEl.textContent = 'Pilih percakapan di sebelah kiri.';
+      replyForm.style.display = 'none';
+      loadThreads();
+    });
     setInterval(loadThreads, 10000); // polling ringan, tanpa SSE/WebSocket
   </script>
 </body>

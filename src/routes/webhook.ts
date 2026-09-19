@@ -1,7 +1,13 @@
 import { Router } from "express";
 import { config } from "../config.js";
 import { verifyWebhookSignature } from "../instagram/webhookSignature.js";
-import { logWebhookEvent, upsertThread, insertInboundMessage, upsertComment } from "../db.js";
+import {
+  logWebhookEvent,
+  upsertThread,
+  insertInboundMessage,
+  upsertComment,
+  getConnectionByInstagramUserId,
+} from "../db.js";
 
 export const webhookRouter = Router();
 
@@ -68,6 +74,13 @@ function handleMessagingEntries(body: unknown): void {
   const entries = (body as { entry?: unknown[] })?.entry ?? [];
 
   for (const entry of entries) {
+    // entry.id = Instagram User ID akun PENERIMA event (dikonfirmasi dari
+    // payload nyata) — dipakai resolve akun mana di NC-IG yang dituju.
+    // Event untuk akun yang belum/tidak terhubung di sini dilewati.
+    const igUserId = (entry as { id?: string })?.id;
+    const conn = igUserId ? getConnectionByInstagramUserId(igUserId) : undefined;
+    if (!conn) continue;
+
     for (const event of extractMessagingEvents(entry)) {
       // Echo = pesan yang dikirim OLEH akun ini sendiri (mis. dari app
       // Instagram langsung, bukan lewat NC-IG) — bukan pesan masuk dari
@@ -78,7 +91,7 @@ function handleMessagingEntries(body: unknown): void {
       const mid = event.message?.mid;
       if (!senderId || !mid) continue;
 
-      const thread = upsertThread(senderId);
+      const thread = upsertThread(conn.id, senderId);
       insertInboundMessage({
         threadId: thread.id,
         mid,
@@ -102,6 +115,10 @@ function handleCommentEntries(body: unknown): void {
   const entries = (body as { entry?: unknown[] })?.entry ?? [];
 
   for (const entry of entries) {
+    const igUserId = (entry as { id?: string })?.id;
+    const conn = igUserId ? getConnectionByInstagramUserId(igUserId) : undefined;
+    if (!conn) continue;
+
     const changes = (entry as { changes?: { field?: string; value?: CommentEvent }[] })?.changes ?? [];
 
     for (const change of changes) {
@@ -109,6 +126,7 @@ function handleCommentEntries(body: unknown): void {
 
       upsertComment({
         id: change.value.id,
+        connectionId: conn.id,
         mediaId: change.value.media?.id,
         fromUsername: change.value.from?.username,
         text: change.value.text,

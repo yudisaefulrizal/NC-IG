@@ -35,7 +35,7 @@ db.exec(`
 
   CREATE TABLE IF NOT EXISTS dm_threads (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    ig_scoped_id TEXT NOT NULL UNIQUE, -- Instagram-scoped ID lawan bicara
+    ig_scoped_id TEXT NOT NULL, -- Instagram-scoped ID lawan bicara
     username TEXT,
     last_message_at TEXT NOT NULL DEFAULT (datetime('now')),
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -97,6 +97,31 @@ db.exec(`
   );
 `);
 
+// Migrasi ringan tanpa framework: tambah kolom connection_id ke tabel yang
+// dibuat sebelum dukungan multi-akun ada. Idempotent — aman dijalankan
+// berkali-kali tiap startup. Baris lama (dari sebelum migrasi ini) akan
+// punya connection_id NULL dan otomatis tidak muncul di query yang
+// difilter per akun — cukup untuk data uji coba lama, tidak perlu backfill.
+function addColumnIfMissing(table: string, column: string, definition: string): void {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+  if (!columns.some((c) => c.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
+}
+
+addColumnIfMissing("dm_threads", "connection_id", "INTEGER REFERENCES connections(id)");
+addColumnIfMissing("ig_comments", "connection_id", "INTEGER REFERENCES connections(id)");
+addColumnIfMissing("posts", "connection_id", "INTEGER REFERENCES connections(id)");
+addColumnIfMissing("stories", "connection_id", "INTEGER REFERENCES connections(id)");
+
+// Unique index terpisah (bukan inline UNIQUE di kolom) karena kolomnya
+// ditambah belakangan via ALTER TABLE — sama IGSID boleh muncul di akun
+// berbeda sebagai thread yang berbeda.
+db.exec(`
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_dm_threads_connection_igscoped
+    ON dm_threads(connection_id, ig_scoped_id);
+`);
+
 export interface Connection {
   id: number;
   instagram_user_id: string;
@@ -129,11 +154,16 @@ export function upsertConnection(data: {
   ).run(data);
 }
 
-// Prototipe single-user: ambil satu koneksi aktif yang paling baru.
-export function getActiveConnection(): Connection | undefined {
-  return db
-    .prepare(`SELECT * FROM connections WHERE status = 'active' ORDER BY id DESC LIMIT 1`)
-    .get() as Connection | undefined;
+// Semua akun yang masih tersambung (belum di-disconnect). Dasar untuk
+// halaman Connection & pemilih akun di nav.
+export function listActiveConnections(): Connection[] {
+  return db.prepare(`SELECT * FROM connections WHERE status = 'active' ORDER BY id ASC`).all() as Connection[];
+}
+
+export function getConnectionById(id: number): Connection | undefined {
+  return db.prepare(`SELECT * FROM connections WHERE id = ? AND status = 'active'`).get(id) as
+    | Connection
+    | undefined;
 }
 
 export function getConnectionByInstagramUserId(instagramUserId: string): Connection | undefined {
@@ -174,6 +204,7 @@ export function logWebhookEvent(eventType: string, payload: unknown): void {
 
 export interface DmThread {
   id: number;
+  connection_id: number | null;
   ig_scoped_id: string;
   username: string | null;
   last_message_at: string;
@@ -190,14 +221,18 @@ export interface DmMessage {
   created_at: string;
 }
 
-// Cari thread yang sudah ada, atau buat baru kalau ini kontak pertama kali.
-export function upsertThread(igScopedId: string): DmThread {
+// Cari thread yang sudah ada UNTUK AKUN INI, atau buat baru kalau ini
+// kontak pertama kali (IGSID yang sama bisa jadi thread berbeda di akun
+// Instagram yang berbeda).
+export function upsertThread(connectionId: number, igScopedId: string): DmThread {
   const existing = db
-    .prepare(`SELECT * FROM dm_threads WHERE ig_scoped_id = ?`)
-    .get(igScopedId) as DmThread | undefined;
+    .prepare(`SELECT * FROM dm_threads WHERE connection_id = ? AND ig_scoped_id = ?`)
+    .get(connectionId, igScopedId) as DmThread | undefined;
   if (existing) return existing;
 
-  const result = db.prepare(`INSERT INTO dm_threads (ig_scoped_id) VALUES (?)`).run(igScopedId);
+  const result = db
+    .prepare(`INSERT INTO dm_threads (connection_id, ig_scoped_id) VALUES (?, ?)`)
+    .run(connectionId, igScopedId);
   return db.prepare(`SELECT * FROM dm_threads WHERE id = ?`).get(result.lastInsertRowid) as DmThread;
 }
 
@@ -237,12 +272,18 @@ export function insertOutboundMessage(data: { threadId: number; mid?: string; te
   touchThread(data.threadId);
 }
 
-export function listThreads(): DmThread[] {
-  return db.prepare(`SELECT * FROM dm_threads ORDER BY last_message_at DESC`).all() as DmThread[];
+export function listThreads(connectionId: number): DmThread[] {
+  return db
+    .prepare(`SELECT * FROM dm_threads WHERE connection_id = ? ORDER BY last_message_at DESC`)
+    .all(connectionId) as DmThread[];
 }
 
-export function getThread(threadId: number): DmThread | undefined {
-  return db.prepare(`SELECT * FROM dm_threads WHERE id = ?`).get(threadId) as DmThread | undefined;
+// Ambil thread HANYA kalau benar milik connectionId ini — mencegah operator
+// mengakses percakapan akun lain dengan menebak-nebak threadId di URL.
+export function getThread(connectionId: number, threadId: number): DmThread | undefined {
+  return db
+    .prepare(`SELECT * FROM dm_threads WHERE id = ? AND connection_id = ?`)
+    .get(threadId, connectionId) as DmThread | undefined;
 }
 
 export function getThreadMessages(threadId: number): DmMessage[] {
@@ -253,6 +294,7 @@ export function getThreadMessages(threadId: number): DmMessage[] {
 
 export interface IgComment {
   id: string;
+  connection_id: number | null;
   media_id: string | null;
   from_username: string | null;
   text: string | null;
@@ -263,18 +305,21 @@ export interface IgComment {
 }
 
 // Idempotent: upsert supaya webhook retry/duplicate tidak bikin baris ganda
-// (comment id dari Meta dipakai langsung sebagai primary key).
+// (comment id dari Meta dipakai langsung sebagai primary key, sudah unik
+// secara global lintas akun).
 export function upsertComment(data: {
   id: string;
+  connectionId: number;
   mediaId?: string;
   fromUsername?: string;
   text?: string;
   rawPayload: unknown;
 }): void {
   db.prepare(
-    `INSERT INTO ig_comments (id, media_id, from_username, text, raw_payload)
-     VALUES (@id, @mediaId, @fromUsername, @text, @rawPayload)
+    `INSERT INTO ig_comments (id, connection_id, media_id, from_username, text, raw_payload)
+     VALUES (@id, @connectionId, @mediaId, @fromUsername, @text, @rawPayload)
      ON CONFLICT(id) DO UPDATE SET
+       connection_id = excluded.connection_id,
        media_id = excluded.media_id,
        from_username = excluded.from_username,
        text = excluded.text,
@@ -282,6 +327,7 @@ export function upsertComment(data: {
        updated_at = datetime('now')`
   ).run({
     id: data.id,
+    connectionId: data.connectionId,
     mediaId: data.mediaId ?? null,
     fromUsername: data.fromUsername ?? null,
     text: data.text ?? null,
@@ -289,12 +335,16 @@ export function upsertComment(data: {
   });
 }
 
-export function listComments(): IgComment[] {
-  return db.prepare(`SELECT * FROM ig_comments ORDER BY created_at DESC`).all() as IgComment[];
+export function listComments(connectionId: number): IgComment[] {
+  return db
+    .prepare(`SELECT * FROM ig_comments WHERE connection_id = ? ORDER BY created_at DESC`)
+    .all(connectionId) as IgComment[];
 }
 
-export function getComment(commentId: string): IgComment | undefined {
-  return db.prepare(`SELECT * FROM ig_comments WHERE id = ?`).get(commentId) as IgComment | undefined;
+export function getComment(connectionId: number, commentId: string): IgComment | undefined {
+  return db
+    .prepare(`SELECT * FROM ig_comments WHERE id = ? AND connection_id = ?`)
+    .get(commentId, connectionId) as IgComment | undefined;
 }
 
 export function insertCommentReply(data: { commentId: string; replyCommentId?: string; text: string }): void {
@@ -311,6 +361,7 @@ export function insertCommentReply(data: { commentId: string; replyCommentId?: s
 }
 
 export function insertPost(data: {
+  connectionId: number;
   igMediaId?: string;
   containerId?: string;
   caption?: string;
@@ -319,9 +370,10 @@ export function insertPost(data: {
   errorMessage?: string;
 }): void {
   db.prepare(
-    `INSERT INTO posts (ig_media_id, container_id, caption, image_url, status, error_message)
-     VALUES (@igMediaId, @containerId, @caption, @imageUrl, @status, @errorMessage)`
+    `INSERT INTO posts (connection_id, ig_media_id, container_id, caption, image_url, status, error_message)
+     VALUES (@connectionId, @igMediaId, @containerId, @caption, @imageUrl, @status, @errorMessage)`
   ).run({
+    connectionId: data.connectionId,
     igMediaId: data.igMediaId ?? null,
     containerId: data.containerId ?? null,
     caption: data.caption ?? null,
@@ -331,11 +383,12 @@ export function insertPost(data: {
   });
 }
 
-export function listPosts() {
-  return db.prepare(`SELECT * FROM posts ORDER BY id DESC`).all();
+export function listPosts(connectionId: number) {
+  return db.prepare(`SELECT * FROM posts WHERE connection_id = ? ORDER BY id DESC`).all(connectionId);
 }
 
 export function insertStory(data: {
+  connectionId: number;
   igMediaId?: string;
   containerId?: string;
   imageUrl: string;
@@ -343,9 +396,10 @@ export function insertStory(data: {
   errorMessage?: string;
 }): void {
   db.prepare(
-    `INSERT INTO stories (ig_media_id, container_id, image_url, status, error_message)
-     VALUES (@igMediaId, @containerId, @imageUrl, @status, @errorMessage)`
+    `INSERT INTO stories (connection_id, ig_media_id, container_id, image_url, status, error_message)
+     VALUES (@connectionId, @igMediaId, @containerId, @imageUrl, @status, @errorMessage)`
   ).run({
+    connectionId: data.connectionId,
     igMediaId: data.igMediaId ?? null,
     containerId: data.containerId ?? null,
     imageUrl: data.imageUrl,
@@ -354,6 +408,6 @@ export function insertStory(data: {
   });
 }
 
-export function listStories() {
-  return db.prepare(`SELECT * FROM stories ORDER BY id DESC`).all();
+export function listStories(connectionId: number) {
+  return db.prepare(`SELECT * FROM stories WHERE connection_id = ? ORDER BY id DESC`).all(connectionId);
 }

@@ -27,6 +27,7 @@
     <a href="/comments.html" class="active">Comments</a>
     <a href="/posts.html">Posts</a>
     <a href="/stories.html">Stories</a>
+    <span id="account-switcher"></span>
   </nav>
 
   <div id="list">Memuat...</div>
@@ -34,6 +35,7 @@
 
   <footer><button id="logout">Logout</button></footer>
 
+  <script src="/account-switcher.js"></script>
   <script>
     const list = document.getElementById('list');
     const statusEl = document.getElementById('message');
@@ -101,7 +103,7 @@
       window.location.href = '/login.html';
     };
 
-    loadComments();
+    initAccountSwitcher(() => loadComments());
     setInterval(loadComments, 10000);
   </script>
 </body>

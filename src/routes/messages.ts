@@ -1,26 +1,48 @@
-import { Router } from "express";
-import { getActiveConnection, listThreads, getThread, getThreadMessages, insertOutboundMessage } from "../db.js";
+import { Router, type Request } from "express";
+import { getConnectionById, listThreads, getThread, getThreadMessages, insertOutboundMessage } from "../db.js";
 import { sendTextMessage } from "../instagram/messaging.js";
+import { getActiveConnectionId } from "../middleware/requireAuth.js";
 
 export const messagesRouter = Router();
 
-messagesRouter.get("/threads", (_req, res) => {
-  res.json({ threads: listThreads() });
+function requireActiveConnection(req: Request) {
+  const connectionId = getActiveConnectionId(req);
+  if (!connectionId) return undefined;
+  return getConnectionById(connectionId);
+}
+
+messagesRouter.get("/threads", (req, res) => {
+  const conn = requireActiveConnection(req);
+  if (!conn) {
+    res.status(400).json({ ok: false, error: "Pilih akun Instagram aktif dulu." });
+    return;
+  }
+  res.json({ threads: listThreads(conn.id) });
 });
 
 messagesRouter.get("/threads/:id", (req, res) => {
-  const threadId = Number(req.params.id);
-  const thread = getThread(threadId);
+  const conn = requireActiveConnection(req);
+  if (!conn) {
+    res.status(400).json({ ok: false, error: "Pilih akun Instagram aktif dulu." });
+    return;
+  }
+
+  const thread = getThread(conn.id, Number(req.params.id));
   if (!thread) {
     res.status(404).json({ ok: false, error: "Thread tidak ditemukan." });
     return;
   }
-  res.json({ thread, messages: getThreadMessages(threadId) });
+  res.json({ thread, messages: getThreadMessages(thread.id) });
 });
 
 messagesRouter.post("/threads/:id/reply", async (req, res) => {
-  const threadId = Number(req.params.id);
-  const thread = getThread(threadId);
+  const conn = requireActiveConnection(req);
+  if (!conn) {
+    res.status(400).json({ ok: false, error: "Pilih akun Instagram aktif dulu." });
+    return;
+  }
+
+  const thread = getThread(conn.id, Number(req.params.id));
   if (!thread) {
     res.status(404).json({ ok: false, error: "Thread tidak ditemukan." });
     return;
@@ -32,12 +54,6 @@ messagesRouter.post("/threads/:id/reply", async (req, res) => {
     return;
   }
 
-  const conn = getActiveConnection();
-  if (!conn) {
-    res.status(400).json({ ok: false, error: "Belum ada akun Instagram yang terhubung." });
-    return;
-  }
-
   try {
     const result = await sendTextMessage({
       igUserId: conn.instagram_user_id,
@@ -45,7 +61,7 @@ messagesRouter.post("/threads/:id/reply", async (req, res) => {
       recipientId: thread.ig_scoped_id,
       text,
     });
-    insertOutboundMessage({ threadId, mid: result.message_id, text });
+    insertOutboundMessage({ threadId: thread.id, mid: result.message_id, text });
     res.json({ ok: true, messageId: result.message_id });
   } catch (err) {
     // Kegagalan paling umum: di luar 24 jam customer service window,

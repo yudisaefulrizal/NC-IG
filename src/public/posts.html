@@ -24,6 +24,7 @@
     <a href="/comments.html">Comments</a>
     <a href="/posts.html" class="active">Posts</a>
     <a href="/stories.html">Stories</a>
+    <span id="account-switcher"></span>
   </nav>
 
   <div class="card">
@@ -48,6 +49,7 @@
 
   <footer><button id="logout">Logout</button></footer>
 
+  <script src="/account-switcher.js"></script>
   <script>
     const statusEl = document.getElementById('message');
     const list = document.getElementById('list');
@@ -108,7 +110,7 @@
       window.location.href = '/login.html';
     };
 
-    loadPosts();
+    initAccountSwitcher(() => loadPosts());
   </script>
 </body>
 </html>

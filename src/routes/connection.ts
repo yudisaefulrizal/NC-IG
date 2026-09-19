@@ -1,32 +1,31 @@
 import { Router } from "express";
-import { getActiveConnection, markConnectionRevoked } from "../db.js";
+import { listActiveConnections, getConnectionById, markConnectionRevoked } from "../db.js";
 import { fetchProfile } from "../instagram/client.js";
 import { createImageContainer, waitForContainerReady, publishContainer } from "../instagram/publish.js";
 import { config } from "../config.js";
+import { getActiveConnectionId } from "../middleware/requireAuth.js";
 
 export const connectionRouter = Router();
 
-// Status koneksi untuk ditampilkan di UI. Token TIDAK PERNAH dikirim ke browser.
-connectionRouter.get("/status", (_req, res) => {
-  const conn = getActiveConnection();
-  if (!conn) {
-    res.json({ connected: false });
-    return;
-  }
-  res.json({
-    connected: true,
-    username: conn.username,
-    instagramUserId: conn.instagram_user_id,
-    scopes: conn.scopes.split(","),
-    tokenExpiresAt: conn.token_expires_at,
-  });
+// Daftar semua akun terhubung + akun mana yang sedang aktif (dari cookie).
+// Token TIDAK PERNAH dikirim ke browser.
+connectionRouter.get("/", (req, res) => {
+  const connections = listActiveConnections().map((c) => ({
+    id: c.id,
+    username: c.username,
+    instagramUserId: c.instagram_user_id,
+    scopes: c.scopes.split(","),
+    tokenExpiresAt: c.token_expires_at,
+  }));
+
+  res.json({ connections, activeConnectionId: getActiveConnectionId(req) ?? null });
 });
 
-// Panggilan API ringan untuk membuktikan token masih hidup.
-connectionRouter.post("/test-api", async (_req, res) => {
-  const conn = getActiveConnection();
+// Panggilan API ringan untuk membuktikan token akun ini masih hidup.
+connectionRouter.post("/:id/test-api", async (req, res) => {
+  const conn = getConnectionById(Number(req.params.id));
   if (!conn) {
-    res.status(400).json({ error: "Belum ada akun Instagram yang terhubung." });
+    res.status(404).json({ error: "Akun tidak ditemukan." });
     return;
   }
 
@@ -39,12 +38,10 @@ connectionRouter.post("/test-api", async (_req, res) => {
 });
 
 // Prototype publishing: pakai gambar contoh yang di-serve NC-IG sendiri.
-// image_url wajib bisa diakses publik oleh server Meta (bukan localhost),
-// jadi ini hanya akan berhasil ketika PUBLIC_BASE_URL menunjuk ke tunnel/domain aktif.
-connectionRouter.post("/test-publish", async (req, res) => {
-  const conn = getActiveConnection();
+connectionRouter.post("/:id/test-publish", async (req, res) => {
+  const conn = getConnectionById(Number(req.params.id));
   if (!conn) {
-    res.status(400).json({ error: "Belum ada akun Instagram yang terhubung." });
+    res.status(404).json({ error: "Akun tidak ditemukan." });
     return;
   }
 
@@ -70,8 +67,8 @@ connectionRouter.post("/test-publish", async (req, res) => {
   }
 });
 
-connectionRouter.post("/disconnect", (_req, res) => {
-  const conn = getActiveConnection();
+connectionRouter.post("/:id/disconnect", (req, res) => {
+  const conn = getConnectionById(Number(req.params.id));
   if (conn) markConnectionRevoked(conn.instagram_user_id);
   res.json({ ok: true });
 });

@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>NC-IG</title>
   <link rel="stylesheet" href="/style.css" />
+  <style>
+    .account-summary { border: 1px solid #e0e0e0; border-radius: 8px; padding: 14px 18px; margin-top: 12px; cursor: pointer; }
+    .account-summary:hover { background: #f7f7f7; }
+  </style>
 </head>
 <body>
   <h1>NC-IG</h1>
@@ -19,31 +23,38 @@
     <a href="/stories.html">Stories</a>
   </nav>
 
-  <div class="card" id="app">Memuat status...</div>
+  <div id="list">Memuat...</div>
 
   <footer><button id="logout">Logout</button></footer>
 
   <script>
-    const app = document.getElementById('app');
+    const list = document.getElementById('list');
 
     async function loadSummary() {
-      const res = await fetch('/api/connection/status');
+      const res = await fetch('/api/connection');
       const data = await res.json();
 
-      if (!data.connected) {
-        app.innerHTML = `
-          <strong>Belum ada akun Instagram terhubung.</strong>
-          <div class="row muted">Buka halaman <a href="/connection.html">Connection</a> untuk menghubungkan akun.</div>
+      if (data.connections.length === 0) {
+        list.innerHTML = `
+          <div class="card">
+            <strong>Belum ada akun Instagram terhubung.</strong>
+            <div class="row muted">Buka halaman <a href="/connection.html">Connection</a> untuk menghubungkan akun.</div>
+          </div>
         `;
         return;
       }
 
-      app.innerHTML = `
-        <strong>Instagram Connected</strong>
-        <div class="row">Username: <strong>@${data.username}</strong></div>
-        <div class="row muted">Token expires: ${new Date(data.tokenExpiresAt).toLocaleString()}</div>
-        <div class="row muted">Kelola koneksi &amp; testing di halaman <a href="/connection.html">Connection</a>.</div>
-      `;
+      list.innerHTML = '';
+      for (const c of data.connections) {
+        const el = document.createElement('div');
+        el.className = 'account-summary';
+        el.innerHTML = `
+          <strong>@${c.username}</strong>
+          <div class="row muted">Token expires: ${new Date(c.tokenExpiresAt).toLocaleString()}</div>
+        `;
+        el.onclick = () => { window.location.href = '/connection.html'; };
+        list.appendChild(el);
+      }
     }
 
     document.getElementById('logout').onclick = async () => {
