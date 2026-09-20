@@ -65,9 +65,10 @@ Status:
 |---|---|---|
 | ✅ | Justifikasi tiap izin | `docs/app-review.md`, dipetakan ke endpoint nyata |
 | ✅ | Daftar izin final (4, tanpa insights) | Sudah ditentukan |
-| ✅ | Skenario video demo | Tertulis langkah demi langkah |
+| ✅ | Skenario video demo | `docs/app-review.md` |
+| ✅ | Naskah narasi video (Inggris) | `docs/app-review-video-script.md` — tinggal dibacakan |
+| ✅ | Ikon aplikasi 1024×1024 | `docs/app-icon-1024.png` — siap diunggah |
 | ⬜ | **Video screencast** | **Harus direkam sendiri** |
-| ⬜ | Ikon aplikasi 1024×1024 | Sumber siap: `docs/logo.png` (1203×1203, persegi) — tinggal diperkecil & diunggah |
 | ❓ | Kategori & deskripsi aplikasi terisi | Pengaturan aplikasi → Dasar |
 | ❓ | Business Verification | Mungkin diminta bersamaan |
 
@@ -75,10 +76,10 @@ Status:
 
 ## Yang tersisa sebelum submit
 
-**1. Rekam video demo** ⬜ — satu-satunya pekerjaan besar yang tersisa.
-Panduan lengkapnya ada di `docs/app-review.md`. Gunakan `@akun_uji` untuk
-memperlihatkan DM & komentar, karena DM asli masih terblokir Standard
-Access.
+**1. Rekam video demo** ⬜ — satu-satunya pekerjaan yang tersisa.
+Naskahnya sudah siap di `docs/app-review-video-script.md`: tinggal ikuti
+urutannya dan bacakan narasinya. Gunakan `@akun_uji` untuk memperlihatkan
+DM & komentar, karena DM asli masih terblokir Standard Access.
 
 **2. Cek 5 item ❓ di Meta App Dashboard** — tidak bisa saya periksa dari
 sini karena butuh akses dashboard:
