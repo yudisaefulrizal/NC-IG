@@ -27,7 +27,7 @@ webhookRouter.get("/instagram", (req, res) => {
 
 // Event notification. Body diverifikasi via raw body middleware di server.ts
 // (req.rawBody diisi sebelum express.json() mem-parse).
-webhookRouter.post("/instagram", (req, res) => {
+webhookRouter.post("/instagram", async (req, res) => {
   const signature = req.header("X-Hub-Signature-256");
   const rawBody = (req as unknown as { rawBody?: Buffer }).rawBody;
 
@@ -39,10 +39,10 @@ webhookRouter.post("/instagram", (req, res) => {
 
   // Log event untuk debugging. TIDAK ADA token/secret di payload webhook,
   // jadi aman dicatat apa adanya.
-  logWebhookEvent(req.body?.object ?? "unknown", req.body);
+  await logWebhookEvent(req.body?.object ?? "unknown", req.body);
 
-  handleMessagingEntries(req.body);
-  handleCommentEntries(req.body);
+  await handleMessagingEntries(req.body);
+  await handleCommentEntries(req.body);
 
   // Meta mengharapkan respons cepat; proses lanjutan (jika ada) sebaiknya
   // dikerjakan async/di luar request ini agar tidak timeout.
@@ -70,7 +70,7 @@ function extractMessagingEvents(entry: unknown): MessagingEvent[] {
   return [...fromMessaging, ...fromChanges];
 }
 
-function handleMessagingEntries(body: unknown): void {
+async function handleMessagingEntries(body: unknown): Promise<void> {
   const entries = (body as { entry?: unknown[] })?.entry ?? [];
 
   for (const entry of entries) {
@@ -78,7 +78,7 @@ function handleMessagingEntries(body: unknown): void {
     // payload nyata) — dipakai resolve akun mana di NC-IG yang dituju.
     // Event untuk akun yang belum/tidak terhubung di sini dilewati.
     const igUserId = (entry as { id?: string })?.id;
-    const conn = igUserId ? getConnectionByInstagramUserId(igUserId) : undefined;
+    const conn = igUserId ? await getConnectionByInstagramUserId(igUserId) : undefined;
     if (!conn) continue;
 
     for (const event of extractMessagingEvents(entry)) {
@@ -91,8 +91,8 @@ function handleMessagingEntries(body: unknown): void {
       const mid = event.message?.mid;
       if (!senderId || !mid) continue;
 
-      const thread = upsertThread(conn.id, senderId);
-      insertInboundMessage({
+      const thread = await upsertThread(conn.id, senderId);
+      await insertInboundMessage({
         threadId: thread.id,
         mid,
         text: event.message?.text,
@@ -111,12 +111,12 @@ interface CommentEvent {
   from?: { username?: string; id?: string };
 }
 
-function handleCommentEntries(body: unknown): void {
+async function handleCommentEntries(body: unknown): Promise<void> {
   const entries = (body as { entry?: unknown[] })?.entry ?? [];
 
   for (const entry of entries) {
     const igUserId = (entry as { id?: string })?.id;
-    const conn = igUserId ? getConnectionByInstagramUserId(igUserId) : undefined;
+    const conn = igUserId ? await getConnectionByInstagramUserId(igUserId) : undefined;
     if (!conn) continue;
 
     const changes = (entry as { changes?: { field?: string; value?: CommentEvent }[] })?.changes ?? [];
@@ -124,7 +124,7 @@ function handleCommentEntries(body: unknown): void {
     for (const change of changes) {
       if (change.field !== "comments" || !change.value?.id) continue;
 
-      upsertComment({
+      await upsertComment({
         id: change.value.id,
         connectionId: conn.id,
         mediaId: change.value.media?.id,

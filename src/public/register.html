@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Login — NC-IG</title>
+  <title>Daftar — NC-IG</title>
   <link rel="stylesheet" href="/style.css" />
   <style>
     body {
@@ -16,12 +16,7 @@
         radial-gradient(circle at 90% 10%, rgba(34, 197, 94, 0.10) 0%, transparent 40%),
         var(--nc-bg);
     }
-    .login-card {
-      width: 100%;
-      max-width: 400px;
-      text-align: center;
-      padding: 40px 36px;
-    }
+    .login-card { width: 100%; max-width: 400px; text-align: center; padding: 40px 36px; }
     .login-card img { width: 96px; margin: 0 auto 8px; display: block; }
     .login-card h1 { font-size: 1.5rem; font-weight: 800; margin: 4px 0 2px; }
     .login-card p.tagline { color: var(--nc-text-muted); margin: 0 0 28px; }
@@ -37,46 +32,52 @@
   <div class="card login-card">
     <img src="/logo.png" alt="NC-IG" />
     <h1>NC-IG</h1>
-    <p class="tagline">Masuk ke dashboard</p>
+    <p class="tagline">Buat akun baru</p>
 
-    <form id="login-form">
+    <form id="register-form">
       <input type="email" id="email" placeholder="Email" autofocus />
-      <input type="password" id="password" placeholder="Password" />
-      <button type="submit" class="primary">Login</button>
+      <input type="password" id="password" placeholder="Password (minimal 8 karakter)" />
+      <input type="password" id="password-confirm" placeholder="Ulangi password" />
+      <button type="submit" class="primary">Daftar</button>
     </form>
     <div id="message"></div>
-    <p class="switch-link">Belum punya akun? <a href="/register.html">Daftar</a></p>
+    <p class="switch-link">Sudah punya akun? <a href="/login.html">Masuk</a></p>
   </div>
 
   <script>
-    const form = document.getElementById('login-form');
+    const form = document.getElementById('register-form');
     const message = document.getElementById('message');
-
-    if (new URLSearchParams(window.location.search).get('registered') === '1') {
-      message.classList.add('success');
-      message.textContent = 'Akun berhasil dibuat. Silakan login.';
-    }
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      message.classList.remove('success');
       message.textContent = '';
+      message.classList.remove('success');
+
       const email = document.getElementById('email').value.trim();
       const password = document.getElementById('password').value;
+      const passwordConfirm = document.getElementById('password-confirm').value;
 
-      const res = await fetch('/session/login', {
+      if (password !== passwordConfirm) {
+        message.textContent = 'Password dan ulangi password tidak sama.';
+        return;
+      }
+
+      const res = await fetch('/session/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
 
+      const data = await res.json().catch(() => ({}));
+
       if (res.ok) {
-        window.location.href = '/';
+        message.classList.add('success');
+        message.textContent = 'Akun berhasil dibuat. Mengalihkan ke halaman login...';
+        setTimeout(() => { window.location.href = '/login.html?registered=1'; }, 1200);
         return;
       }
 
-      const data = await res.json().catch(() => ({}));
-      message.textContent = data.error || 'Login gagal.';
+      message.textContent = data.error || 'Gagal mendaftar.';
     });
   </script>
 </body>

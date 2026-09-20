@@ -10,7 +10,8 @@ import { messagesRouter } from "./routes/messages.js";
 import { commentsRouter } from "./routes/comments.js";
 import { postsRouter } from "./routes/posts.js";
 import { storiesRouter } from "./routes/stories.js";
-import { sessionRouter } from "./routes/session.js";
+import { templatesRouter } from "./routes/templates.js";
+import { sessionRouter, activeConnectionRouter } from "./routes/session.js";
 import { requireAuth } from "./middleware/requireAuth.js";
 
 const app = express();
@@ -38,7 +39,8 @@ app.use(express.urlencoded({ extended: false })); // untuk signed_request (form-
 // mengunduhnya, jadi WAJIB tetap bisa diakses tanpa cookie.
 app.get("/sample.jpg", (_req, res) => res.sendFile(path.join(publicDir, "sample.jpg")));
 app.get("/login.html", (_req, res) => res.sendFile(path.join(publicDir, "login.html")));
-// style.css & logo.png dipakai juga oleh login.html, jadi harus ikut publik.
+app.get("/register.html", (_req, res) => res.sendFile(path.join(publicDir, "register.html")));
+// style.css & logo.png dipakai juga oleh login.html/register.html, jadi harus ikut publik.
 app.get("/style.css", (_req, res) => res.sendFile(path.join(publicDir, "style.css")));
 app.get("/logo.png", (_req, res) => res.sendFile(path.join(publicDir, "logo.png")));
 
@@ -61,11 +63,13 @@ app.use("/session", sessionRouter);
 app.use(requireAuth);
 
 app.use("/auth", authRouter);
+app.use("/session", activeConnectionRouter);
 app.use("/api/connection", connectionRouter);
 app.use("/api/messages", messagesRouter);
 app.use("/api/comments", commentsRouter);
 app.use("/api/posts", postsRouter);
 app.use("/api/stories", storiesRouter);
+app.use("/api/templates", templatesRouter);
 app.use(express.static(publicDir));
 
 app.listen(config.port, config.host, () => {

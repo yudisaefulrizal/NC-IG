@@ -11,16 +11,19 @@
     "build": "tsc",
     "start": "node --env-file=.env dist/server.js",
     "test": "tsx --test test/*.test.ts",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "migrate": "tsx --env-file=.env src/migrate.ts",
+    "migrate:from-sqlite": "tsx --env-file=.env src/migrateFromSqlite.ts"
   },
   "dependencies": {
-    "better-sqlite3": "^11.10.0",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "mysql2": "^3.24.4"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
     "@types/express": "^5.0.6",
     "@types/node": "^22.15.30",
+    "better-sqlite3": "^11.10.0",
     "tsx": "^4.23.13",
     "typescript": "^5.9.3"
   }

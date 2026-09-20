@@ -12,7 +12,7 @@ export const dataDeletionStatusRouter = Router();
 // Data Deletion Request Callback.
 // Meta POST signed_request -> kita HARUS benar-benar menghapus data user
 // tsb, lalu balas { url, confirmation_code } (bukan sekadar 200 kosong).
-dataDeletionRouter.post("/instagram/data-deletion", (req, res) => {
+dataDeletionRouter.post("/instagram/data-deletion", async (req, res) => {
   const signedRequest = req.body?.signed_request as string | undefined;
   if (!signedRequest) {
     res.sendStatus(400);
@@ -26,7 +26,7 @@ dataDeletionRouter.post("/instagram/data-deletion", (req, res) => {
     return;
   }
 
-  deleteConnectionData(payload.user_id);
+  await deleteConnectionData(payload.user_id);
 
   const confirmationCode = randomBytes(8).toString("hex");
   console.log(`Data user Instagram ${payload.user_id} dihapus. Kode konfirmasi: ${confirmationCode}`);

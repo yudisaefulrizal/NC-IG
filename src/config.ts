@@ -1,7 +1,6 @@
 // Baca & validasi environment variable sekali di awal proses.
 // Kalau ada yang wajib tapi kosong, gagal cepat (fail fast) dengan pesan jelas
 // daripada error samar di tengah request nanti.
-import { hashPassword } from "./lib/session.js";
 
 function required(name: string): string {
   const value = process.env[name];
@@ -27,10 +26,14 @@ export const config = {
   instagramRedirectUri: required("INSTAGRAM_REDIRECT_URI"),
   instagramWebhookVerifyToken: required("INSTAGRAM_WEBHOOK_VERIFY_TOKEN"),
 
-  dataDir: optional("DATA_DIR", "./data"),
+  dbHost: optional("DB_HOST", "localhost"),
+  dbUser: required("DB_USER"),
+  dbPassword: required("DB_PASSWORD"),
+  dbName: required("DB_NAME"),
 
-  // Login dashboard NC-IG (operator tunggal). Hash dihitung sekali di sini
-  // saat startup, bukan per-request. Password asli tidak pernah disimpan.
+  // Dipakai HANYA oleh skrip migrate:from-sqlite, opsional saat runtime biasa.
+  legacySqlitePath: optional("LEGACY_SQLITE_PATH", "./data/nc-ig.sqlite"),
+  legacyAdminPassword: optional("ADMIN_PASSWORD", ""),
+
   sessionSecret: required("SESSION_SECRET"),
-  adminPasswordHash: hashPassword(required("ADMIN_PASSWORD")),
 };

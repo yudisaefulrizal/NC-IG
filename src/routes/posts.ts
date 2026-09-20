@@ -1,27 +1,28 @@
-import { Router, type Request } from "express";
-import { getConnectionById, insertPost, listPosts } from "../db.js";
+import { Router, type Request, type Response } from "express";
+import { getConnectionById, insertPost, listPosts, type Role } from "../db.js";
 import { createImageContainer, waitForContainerReady, publishContainer } from "../instagram/publish.js";
 import { getActiveConnectionId } from "../middleware/requireAuth.js";
 
 export const postsRouter = Router();
 
-function requireActiveConnection(req: Request) {
+function requireActiveConnection(req: Request, res: Response) {
   const connectionId = getActiveConnectionId(req);
   if (!connectionId) return undefined;
-  return getConnectionById(connectionId);
+  const account = res.locals.account as { id: string; role: Role };
+  return getConnectionById(connectionId, account.id, account.role);
 }
 
-postsRouter.get("/", (req, res) => {
-  const conn = requireActiveConnection(req);
+postsRouter.get("/", async (req, res) => {
+  const conn = await requireActiveConnection(req, res);
   if (!conn) {
     res.status(400).json({ ok: false, error: "Pilih akun Instagram aktif dulu." });
     return;
   }
-  res.json({ posts: listPosts(conn.id) });
+  res.json({ posts: await listPosts(conn.id) });
 });
 
 postsRouter.post("/", async (req, res) => {
-  const conn = requireActiveConnection(req);
+  const conn = await requireActiveConnection(req, res);
   if (!conn) {
     res.status(400).json({ ok: false, error: "Pilih akun Instagram aktif dulu." });
     return;
@@ -48,13 +49,13 @@ postsRouter.post("/", async (req, res) => {
       creationId: containerId,
     });
 
-    insertPost({ connectionId: conn.id, igMediaId: mediaId, containerId, caption, imageUrl, status: "published" });
+    await insertPost({ connectionId: conn.id, igMediaId: mediaId, containerId, caption, imageUrl, status: "published" });
     res.json({ ok: true, mediaId });
   } catch (err) {
     // Simpan tetap sebagai riwayat (status failed) supaya bisa diaudit,
     // bukan cuma dibuang begitu saja.
     const message = err instanceof Error ? err.message : "Gagal publish";
-    insertPost({ connectionId: conn.id, containerId, caption, imageUrl, status: "failed", errorMessage: message });
+    await insertPost({ connectionId: conn.id, containerId, caption, imageUrl, status: "failed", errorMessage: message });
     res.status(502).json({ ok: false, error: message });
   }
 });

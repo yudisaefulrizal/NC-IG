@@ -1,6 +1,6 @@
 // Util murni untuk password hashing & session token, tanpa dependency di
 // luar node:crypto — konsisten dengan gaya webhookSignature.ts/signedRequest.ts.
-import { scryptSync, randomBytes, createHmac, timingSafeEqual } from "node:crypto";
+import { scryptSync, randomBytes, createHash, timingSafeEqual } from "node:crypto";
 
 const SCRYPT_KEYLEN = 64;
 
@@ -20,37 +20,17 @@ export function verifyPassword(password: string, stored: string): boolean {
   return expected.length === actual.length && timingSafeEqual(expected, actual);
 }
 
-function base64url(input: Buffer): string {
-  return input.toString("base64url");
+// Session sekarang DB-backed (tabel login_sessions), bukan token stateless
+// HMAC lagi — supaya logout/suspend bisa langsung mencabut sesi dari server.
+// Cookie berisi token MENTAH (random, tebakan praktis mustahil); yang
+// disimpan di DB hanya hash SHA-256-nya, supaya kebocoran isi tabel
+// login_sessions tidak langsung memberi akses (mirip prinsip password hash,
+// walau SHA-256 cukup di sini karena token sendiri sudah punya entropi tinggi
+// — beda dengan password yang dipilih manusia dan butuh scrypt).
+export function generateSessionToken(): string {
+  return randomBytes(32).toString("hex");
 }
 
-// Token stateless: payload "{exp}" (base64url) + "." + signature HMAC-SHA256
-// (base64url) dari payload, ditandatangani dengan SESSION_SECRET. Tidak ada
-// penyimpanan di DB — verifikasi cukup cek signature + expiry.
-export function createSessionToken(secret: string, ttlMs: number): string {
-  const exp = Date.now() + ttlMs;
-  const payload = base64url(Buffer.from(JSON.stringify({ exp })));
-  const signature = base64url(createHmac("sha256", secret).update(payload).digest());
-  return `${payload}.${signature}`;
-}
-
-export function verifySessionToken(token: string | undefined, secret: string): boolean {
-  if (!token) return false;
-
-  const [payload, signature] = token.split(".");
-  if (!payload || !signature) return false;
-
-  const expectedSignature = base64url(createHmac("sha256", secret).update(payload).digest());
-  const expectedBuf = Buffer.from(expectedSignature);
-  const actualBuf = Buffer.from(signature);
-  if (expectedBuf.length !== actualBuf.length || !timingSafeEqual(expectedBuf, actualBuf)) {
-    return false;
-  }
-
-  try {
-    const { exp } = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as { exp: number };
-    return typeof exp === "number" && Date.now() < exp;
-  } catch {
-    return false;
-  }
+export function hashToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
 }

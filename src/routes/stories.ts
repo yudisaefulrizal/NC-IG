@@ -1,27 +1,28 @@
-import { Router, type Request } from "express";
-import { getConnectionById, insertStory, listStories } from "../db.js";
+import { Router, type Request, type Response } from "express";
+import { getConnectionById, insertStory, listStories, type Role } from "../db.js";
 import { createImageContainer, waitForContainerReady, publishContainer } from "../instagram/publish.js";
 import { getActiveConnectionId } from "../middleware/requireAuth.js";
 
 export const storiesRouter = Router();
 
-function requireActiveConnection(req: Request) {
+function requireActiveConnection(req: Request, res: Response) {
   const connectionId = getActiveConnectionId(req);
   if (!connectionId) return undefined;
-  return getConnectionById(connectionId);
+  const account = res.locals.account as { id: string; role: Role };
+  return getConnectionById(connectionId, account.id, account.role);
 }
 
-storiesRouter.get("/", (req, res) => {
-  const conn = requireActiveConnection(req);
+storiesRouter.get("/", async (req, res) => {
+  const conn = await requireActiveConnection(req, res);
   if (!conn) {
     res.status(400).json({ ok: false, error: "Pilih akun Instagram aktif dulu." });
     return;
   }
-  res.json({ stories: listStories(conn.id) });
+  res.json({ stories: await listStories(conn.id) });
 });
 
 storiesRouter.post("/", async (req, res) => {
-  const conn = requireActiveConnection(req);
+  const conn = await requireActiveConnection(req, res);
   if (!conn) {
     res.status(400).json({ ok: false, error: "Pilih akun Instagram aktif dulu." });
     return;
@@ -50,11 +51,11 @@ storiesRouter.post("/", async (req, res) => {
       creationId: containerId,
     });
 
-    insertStory({ connectionId: conn.id, igMediaId: mediaId, containerId, imageUrl, status: "published" });
+    await insertStory({ connectionId: conn.id, igMediaId: mediaId, containerId, imageUrl, status: "published" });
     res.json({ ok: true, mediaId });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Gagal publish story";
-    insertStory({ connectionId: conn.id, containerId, imageUrl, status: "failed", errorMessage: message });
+    await insertStory({ connectionId: conn.id, containerId, imageUrl, status: "failed", errorMessage: message });
     res.status(502).json({ ok: false, error: message });
   }
 });

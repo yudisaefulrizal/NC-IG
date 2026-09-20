@@ -9,18 +9,22 @@ import { fetchProfile } from "../instagram/client.js";
 import { saveOAuthState, consumeOAuthState, upsertConnection } from "../db.js";
 
 // Mulai flow OAuth: hanya boleh dipicu operator yang sudah login (di-mount
-// di server.ts SETELAH requireAuth). Buat state anti-CSRF, simpan, lalu
-// redirect ke Instagram.
+// di server.ts SETELAH requireAuth). State disimpan bareng account_id milik
+// operator ini, supaya callback (yang di luar requireAuth) tetap tahu siapa
+// pemiliknya tanpa bergantung ke cookie session masih ada saat redirect.
 export const authRouter = Router();
-authRouter.get("/instagram", (_req, res) => {
+authRouter.get("/instagram", async (req, res) => {
+  const account = res.locals.account as { id: string };
   const state = generateState();
-  saveOAuthState(state);
+  await saveOAuthState(state, account.id);
   res.redirect(buildAuthorizeUrl(state));
 });
 
 // Callback dari Instagram setelah user approve/tolak — dipanggil via redirect
 // browser dari Meta, BUKAN dari konteks session operator. Router terpisah,
-// di-mount di server.ts SEBELUM requireAuth supaya tetap terbuka.
+// di-mount di server.ts SEBELUM requireAuth supaya tetap terbuka. Identitas
+// pemilik didapat dari account_id yang tersimpan bareng oauth `state`
+// (lihat authRouter di atas), bukan dari cookie session.
 export const authCallbackRouter = Router();
 authCallbackRouter.get("/instagram/callback", async (req, res) => {
   const { code, state, error, error_reason: errorReason } = req.query as Record<string, string | undefined>;
@@ -31,7 +35,13 @@ authCallbackRouter.get("/instagram/callback", async (req, res) => {
     return;
   }
 
-  if (!state || !consumeOAuthState(state)) {
+  if (!state) {
+    res.status(400).send("State OAuth tidak valid atau sudah kedaluwarsa. Silakan ulangi Connect Instagram.");
+    return;
+  }
+
+  const accountId = await consumeOAuthState(state);
+  if (!accountId) {
     res.status(400).send("State OAuth tidak valid atau sudah kedaluwarsa. Silakan ulangi Connect Instagram.");
     return;
   }
@@ -49,7 +59,8 @@ authCallbackRouter.get("/instagram/callback", async (req, res) => {
 
     const expiresAt = new Date(Date.now() + longLived.expires_in * 1000).toISOString();
 
-    upsertConnection({
+    await upsertConnection({
+      accountId,
       instagramUserId: profile.user_id,
       username: profile.username,
       accessToken: longLived.access_token,
