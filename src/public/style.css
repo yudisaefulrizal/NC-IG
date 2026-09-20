@@ -107,7 +107,12 @@ code { font-family: ui-monospace, "SF Mono", Consolas, monospace; }
 
 /* Tautan sekunder di footer sidebar (mis. Kebijakan Privasi) — sengaja
    lebih kecil & redup dari tombol Logout supaya tidak bersaing perhatian. */
-.sidebar-footer a {
+/* :link & :visited ditulis eksplisit — tanpa itu, browser memakai warna
+   bawaan link terkunjungi (ungu) yang kekhususannya menimpa aturan `a`
+   biasa, sehingga tautan berubah ungu setelah sekali dibuka. */
+.sidebar-footer a,
+.sidebar-footer a:link,
+.sidebar-footer a:visited {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -117,7 +122,8 @@ code { font-family: ui-monospace, "SF Mono", Consolas, monospace; }
   font-size: 0.85rem;
   border-radius: var(--nc-radius-md);
 }
-.sidebar-footer a:hover { background: rgba(255, 255, 255, 0.06); color: #fff; }
+.sidebar-footer a:hover,
+.sidebar-footer a:visited:hover { background: rgba(255, 255, 255, 0.06); color: #fff; }
 
 .content { flex: 1; padding: 32px 40px; min-width: 0; overflow-x: auto; }
 .content-header {
