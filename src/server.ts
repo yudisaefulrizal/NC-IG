@@ -40,6 +40,11 @@ app.use(express.urlencoded({ extended: false })); // untuk signed_request (form-
 app.get("/sample.jpg", (_req, res) => res.sendFile(path.join(publicDir, "sample.jpg")));
 app.get("/login.html", (_req, res) => res.sendFile(path.join(publicDir, "login.html")));
 app.get("/register.html", (_req, res) => res.sendFile(path.join(publicDir, "register.html")));
+// Kebijakan privasi WAJIB bisa diakses tanpa login — URL-nya didaftarkan di
+// Meta App Dashboard dan dibuka reviewer yang tidak punya akun NC-IG.
+// Dilayani di dua path: /privacy.html (file langsung) dan /privacy (URL rapi
+// untuk didaftarkan di dashboard Meta).
+app.get(["/privacy", "/privacy.html"], (_req, res) => res.sendFile(path.join(publicDir, "privacy.html")));
 // style.css & logo.png dipakai juga oleh login.html/register.html, jadi harus ikut publik.
 app.get("/style.css", (_req, res) => res.sendFile(path.join(publicDir, "style.css")));
 app.get("/logo.png", (_req, res) => res.sendFile(path.join(publicDir, "logo.png")));
