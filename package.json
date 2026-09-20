@@ -13,7 +13,8 @@
     "test": "tsx --test test/*.test.ts",
     "check": "tsc --noEmit",
     "migrate": "tsx --env-file=.env src/migrate.ts",
-    "migrate:from-sqlite": "tsx --env-file=.env src/migrateFromSqlite.ts"
+    "migrate:from-sqlite": "tsx --env-file=.env src/migrateFromSqlite.ts",
+    "seed:test-connection": "tsx --env-file=.env src/seedTestConnection.ts"
   },
   "dependencies": {
     "express": "^5.2.1",

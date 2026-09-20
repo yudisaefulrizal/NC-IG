@@ -11,6 +11,13 @@ import {
 
 export const webhookRouter = Router();
 
+// Tombol "Uji" di Meta App Dashboard mengirim payload sampel dengan
+// entry.id = "0" (ID dummy, bukan akun Instagram mana pun). Supaya hasil
+// klik Uji bisa dilihat di halaman DM/Komentar, buat koneksi uji dengan ID
+// ini lewat `npm run seed:test-connection`. Tanpa koneksi itu, payload uji
+// tetap diabaikan seperti event untuk akun tak dikenal lainnya.
+const SAMPLE_ENTRY_ID = "0";
+
 // Verification handshake (satu kali saat mendaftarkan webhook di dashboard).
 // https://developers.facebook.com/documentation/instagram-platform/webhooks
 webhookRouter.get("/instagram", (req, res) => {
@@ -79,7 +86,15 @@ async function handleMessagingEntries(body: unknown): Promise<void> {
     // Event untuk akun yang belum/tidak terhubung di sini dilewati.
     const igUserId = (entry as { id?: string })?.id;
     const conn = igUserId ? await getConnectionByInstagramUserId(igUserId) : undefined;
-    if (!conn) continue;
+    if (!conn) {
+      if (igUserId === SAMPLE_ENTRY_ID) {
+        console.warn(
+          "Payload uji Meta diterima, tapi koneksi uji belum dibuat. " +
+            "Jalankan: npm run seed:test-connection"
+        );
+      }
+      continue;
+    }
 
     for (const event of extractMessagingEvents(entry)) {
       // Echo = pesan yang dikirim OLEH akun ini sendiri (mis. dari app
