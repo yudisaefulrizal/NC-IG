@@ -105,6 +105,20 @@ code { font-family: ui-monospace, "SF Mono", Consolas, monospace; }
 }
 .sidebar-footer button:hover { background: rgba(255, 255, 255, 0.06); color: #fff; }
 
+/* Tautan sekunder di footer sidebar (mis. Kebijakan Privasi) — sengaja
+   lebih kecil & redup dari tombol Logout supaya tidak bersaing perhatian. */
+.sidebar-footer a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  color: #8fa3b8;
+  text-decoration: none;
+  font-size: 0.85rem;
+  border-radius: var(--nc-radius-md);
+}
+.sidebar-footer a:hover { background: rgba(255, 255, 255, 0.06); color: #fff; }
+
 .content { flex: 1; padding: 32px 40px; min-width: 0; overflow-x: auto; }
 .content-header {
   display: flex;
